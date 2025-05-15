@@ -1,0 +1,36 @@
+# Environment variables
+.env
+
+# Cached files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+ENV/
+.env/
+.env
+# User-uploaded content
+uploads/*
+!uploads/.gitkeep
+output/*
+!output/.gitkeep
+
+# Session files
+flask_session/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db

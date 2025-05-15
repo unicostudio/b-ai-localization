@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processing - Game Localization Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+        .main-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .progress {
+            height: 25px;
+        }
+        #status-container {
+            min-height: 250px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .status-log {
+            margin-bottom: 8px;
+            font-family: monospace;
+        }
+        .output-file {
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="main-container">
+                    <h1 class="text-center mb-4">Game Localization Process</h1>
+                    
+                    <!-- Warning Modal -->
+                    <div class="modal fade" id="warningModal" tabindex="-1" aria-labelledby="warningModalLabel" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="warningModalLabel">Warning</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p id="warning-message">No image directory specified or the directory doesn't exist.</p>
+                                    <p>Do you want to proceed with text-only localization?</p>
+                                    <ul>
+                                        <li>Image descriptions will be skipped</li>
+                                        <li>"ENTERED IMAGE FOLDER NOT SHOWN" will appear in the description field</li>
+                                        <li>Only the text in the CSV will be localized</li>
+                                    </ul>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancel-btn">Cancel</button>
+                                    <button type="button" class="btn btn-primary" id="proceed-btn">Proceed Anyway</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="api-limits-container" class="mb-4" style="display: none;">
+                        <h4>OpenRouter API Limits</h4>
+                        <div class="card">
+                            <div class="card-body">
+                                <div id="api-limits-content">
+                                    <div class="d-flex justify-content-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="progress-container" class="mb-4">
+                        <h4>Processing Progress</h4>
+                        <div class="progress mb-3" style="height: 25px;">
+                            <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div id="current-status" class="text-center">Initializing...</div>
+                    </div>
+                    
+                    <div id="status-container">
+                        <div class="status-log">Preparing to start processing...</div>
+                    </div>
+                    
+                    <div id="result-container" class="mt-4" style="display: none;">
+                        <h3>Results</h3>
+                        <div class="alert alert-success">Processing completed successfully!</div>
+                        
+                        <div>
+                            <h5>Output Files:</h5>
+                            <div id="json-output" class="output-file"></div>
+                            <div id="csv-output" class="output-file"></div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <a href="/" class="btn btn-primary">Start New Process</a>
+                            <div class="mt-2">
+                                <button id="downloadAllByLang" class="btn btn-success">Download All by Lang</button>
+                                <div class="mt-2 small text-muted">Download all selected languages as separate JSON files.</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Export functionality has been removed -->
+                    </div>
+                    
+                    <div id="error-container" class="mt-4" style="display: none;">
+                        <div class="alert alert-danger">
+                            <h4>Processing Failed</h4>
+                            <p id="error-message"></p>
+                            <p id="error-help" class="mt-2"></p>
+                        </div>
+                        <div class="mt-3">
+                            <a href="/" class="btn btn-primary">Back to Home</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize OpenRouter API key from server data
+            window.openRouterApiKey = "{{ api_key }}";
+            
+            var socket = io();
+            var progressBar = document.getElementById('progress-bar');
+            var currentStatus = document.getElementById('current-status');
+            var statusContainer = document.getElementById('status-container');
+            var resultContainer = document.getElementById('result-container');
+            var errorContainer = document.getElementById('error-container');
+            var errorMessage = document.getElementById('error-message');
+            var jsonOutput = document.getElementById('json-output');
+            var csvOutput = document.getElementById('csv-output');
+            
+            // Progress simulation values
+            var currentProgress = 0;
+            var targetProgress = 5; // Start at 5%
+            var progressInterval;
+            var skipImagesConfirmed = false;
+            
+            // Update progress smoothly
+            function updateProgress() {
+                if (currentProgress < targetProgress) {
+                    currentProgress += 0.5;
+                    progressBar.style.width = currentProgress + '%';
+                    
+                    if (currentProgress >= 100) {
+                        clearInterval(progressInterval);
+                    }
+                }
+            }
+            
+            // Start the progress animation
+            progressInterval = setInterval(updateProgress, 100);
+            
+            // Add log entry to status container
+            function addStatusLog(message) {
+                var logEntry = document.createElement('div');
+                logEntry.className = 'status-log';
+                logEntry.textContent = message;
+                statusContainer.appendChild(logEntry);
+                statusContainer.scrollTop = statusContainer.scrollHeight;
+            }
+            
+            // Add debug status log
+            addStatusLog('Initializing Socket.IO connection...');
+            
+            // Track if processing has already started
+            var processingStarted = false;
+            
+            // Function to check OpenRouter API limits
+            function checkOpenRouterLimits() {
+                // Get the API key from a variable set by the server
+                var apiKey = window.openRouterApiKey || '';
+                
+                if (apiKey) {
+                    // Show the API limits container
+                    document.getElementById('api-limits-container').style.display = 'block';
+                    
+                    // Make the request to get API limits
+                    fetch(`/check_openrouter_limits?api_key=${encodeURIComponent(apiKey)}`, {
+                        method: 'GET'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Format and display the limits
+                            var limitsContent = document.getElementById('api-limits-content');
+                            var limitData = data.data;
+                            
+                            var html = '<h5>API Key Information</h5>';
+                            html += '<table class="table table-sm">';
+                            html += '<tr><th>Key Name:</th><td>' + (limitData.name || 'Unnamed Key') + '</td></tr>';
+                            
+                            if (limitData.rate_limits) {
+                                html += '<tr><th>Rate Limits:</th><td></td></tr>';
+                                limitData.rate_limits.forEach(limit => {
+                                    var used = limit.used || 0;
+                                    var limit_value = limit.limit || 0;
+                                    var percent = limit_value > 0 ? (used / limit_value * 100) : 0;
+                                    
+                                    html += '<tr><td colspan="2">';
+                                    html += '<div class="d-flex justify-content-between align-items-center">';
+                                    html += '<span>' + limit.route + ': ' + used + ' / ' + limit_value + '</span>';
+                                    html += '<span class="badge bg-' + (percent > 80 ? 'danger' : (percent > 50 ? 'warning' : 'success')) + '">' + 
+                                          Math.round(percent) + '%</span>';
+                                    html += '</div>';
+                                    html += '<div class="progress" style="height: 10px;">';
+                                    html += '<div class="progress-bar bg-' + (percent > 80 ? 'danger' : (percent > 50 ? 'warning' : 'success')) + '" ' + 
+                                          'style="width: ' + percent + '%"></div>';
+                                    html += '</div>';
+                                    html += '</td></tr>';
+                                });
+                            }
+                            
+                            html += '</table>';
+                            limitsContent.innerHTML = html;
+                        } else {
+                            // Show error
+                            document.getElementById('api-limits-content').innerHTML = 
+                                '<div class="alert alert-warning">Could not retrieve API limits: ' + data.error + '</div>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching API limits:', error);
+                        document.getElementById('api-limits-content').innerHTML = 
+                            '<div class="alert alert-danger">Error checking API limits. Please see console for details.</div>';
+                    });
+                } else {
+                    // No API key or debug mode is on
+                    document.getElementById('api-limits-container').style.display = 'none';
+                }
+            }
+            
+            // Add connection status event handlers
+            socket.on('connect', function() {
+                addStatusLog('Socket connected!');
+                
+                // Check OpenRouter API limits
+                checkOpenRouterLimits();
+                
+                // Only start processing if it hasn't been started yet
+                if (!processingStarted) {
+                    processingStarted = true;
+                    addStatusLog('Checking image directory status...');
+                    // Check if we need to show the warning modal
+                    socket.emit('check_image_warning', {});
+                } else {
+                    addStatusLog('Reconnected to server. Processing already in progress.');
+                }
+            });
+            
+            // Track if downloads have been initiated to prevent showing errors during downloads
+            var downloadsStarted = false;
+            
+            socket.on('connect_error', function(error) {
+                // Only show error if processing hasn't completed or downloads haven't started
+                if (!window.processingCompleted && !downloadsStarted) {
+                    addStatusLog('Connection error: ' + error);
+                    errorMessage.textContent = 'Failed to connect to server: ' + error;
+                    errorContainer.style.display = 'block';
+                } else {
+                    // If we're disconnected after processing is complete, it's likely due to the download - no need to show error
+                    console.log('Connection error after processing completed - likely due to download. Ignoring.');
+                }
+            });
+            
+            // Handle image warning check response with timeout protection
+            var warningResponseReceived = false;
+            socket.on('image_warning_status', function(data) {
+                warningResponseReceived = true;
+                addStatusLog('Received image directory status');
+                
+                if (data.show_warning) {
+                    // Update warning message if provided
+                    if (data.message) {
+                        document.getElementById('warning-message').textContent = data.message;
+                    }
+                    addStatusLog('Image directory warning: ' + data.message);
+                    
+                    // Show the warning modal
+                    var warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
+                    warningModal.show();
+                    
+                    // If the user cancels, go back to the home page
+                    document.getElementById('cancel-btn').addEventListener('click', function() {
+                        window.location.href = '/';
+                    });
+                    
+                    // If the user proceeds, start processing without images
+                    document.getElementById('proceed-btn').addEventListener('click', function() {
+                        skipImagesConfirmed = true;
+                        warningModal.hide();
+                        addStatusLog('Starting processing without images...');
+                        socket.emit('start_processing', {skip_images: true});
+                    });
+                } else {
+                    // No warning needed, start processing normally
+                    addStatusLog('Image directory valid. Starting processing...');
+                    socket.emit('start_processing', {skip_images: false});
+                }
+            });
+            
+            // Fallback for if warning check doesn't respond
+            setTimeout(function() {
+                if (!warningResponseReceived) {
+                    addStatusLog('Warning check timed out. Starting processing anyway...');
+                    socket.emit('start_processing', {skip_images: false});
+                }
+            }, 5000); // 5 second timeout
+            
+            // Handle status updates
+            socket.on('update_status', function(data) {
+                console.log('Status update:', data);
+                
+                // Add to log
+                addStatusLog(data.status);
+                
+                // Update current status
+                currentStatus.textContent = data.status;
+                
+                // Store output formats if available
+                var selectedOutputFormats = [];
+                if (data.output_formats) {
+                    selectedOutputFormats = data.output_formats;
+                    console.log('Selected output formats:', selectedOutputFormats);
+                }
+                
+                // Handle completion
+                if (data.complete) {
+                    // Permanently mark processing as completed to prevent restarts
+                    processingStarted = true;
+                    window.processingCompleted = true;
+                    
+                    // Show result container
+                    document.getElementById('progress-container').style.display = 'none';
+                    
+                    if (data.error) {
+                        // Show error message
+                        document.getElementById('error-container').style.display = 'block';
+                        document.getElementById('error-message').textContent = data.status;
+                        
+                        // Suggest common fixes
+                        var helpText = "Try checking your inputs and API keys. If the problem persists, consult the logs for more details.";
+                        document.getElementById('error-help').textContent = helpText;
+                    } else {
+                        // Show success message and file links
+                        document.getElementById('result-container').style.display = 'block';
+                        
+                        // Instead of displaying file paths, just show download status messages
+                        document.getElementById('json-output').innerHTML = '';
+                        document.getElementById('csv-output').innerHTML = '';
+                        
+                        // Status messages for different output formats
+                        if (data.json_path) {
+                            document.getElementById('json-output').innerHTML = 
+                                '<div class="alert alert-success">Complete output.json file is being downloaded automatically</div>';
+                            
+                            // Force download regardless of selected format
+                            console.log('Initiating automatic download of output.json file: ' + data.json_path);
+                            // Create download iframe with a small delay
+                            setTimeout(function() {
+                                var iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                iframe.src = '/download?file_path=' + encodeURIComponent(data.json_path);
+                                document.body.appendChild(iframe);
+                            }, 500);
+                        }
+                        
+                        // Status message and download for language-specific JSON files
+                        if (data.zip_path) {
+                            // Add status message
+                            document.getElementById('json-output').innerHTML += 
+                                '<div class="alert alert-success mt-2">Language-specific JSON files are being downloaded automatically</div>';
+                            
+                            // Force download the ZIP file
+                            console.log('Initiating automatic download of ZIP file: ' + data.zip_path);
+                            setTimeout(function() {
+                                var iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                iframe.src = '/download?file_path=' + encodeURIComponent(data.zip_path);
+                                document.body.appendChild(iframe);
+                            }, 2000); // Small delay after the first download
+                        }
+                        
+                        // Use plain links as backup in case auto-download fails
+                        if (data.json_path || data.zip_path) {
+                            var links = '<div class="mt-3"><p>If downloads don\'t start automatically, use these links:</p><ul>';
+                            
+                            if (data.json_path) {
+                                links += '<li><a href="/download?file_path=' + encodeURIComponent(data.json_path) + '" class="btn btn-link">Download Complete JSON</a></li>';
+                            }
+                            
+                            if (data.zip_path) {
+                                links += '<li><a href="/download?file_path=' + encodeURIComponent(data.zip_path) + '" class="btn btn-link">Download Language-specific JSON</a></li>';
+                            }
+                            
+                            links += '</ul></div>';
+                            document.getElementById('json-output').innerHTML += links;
+                        }
+                        
+                        // Completely remove the download button since we're handling downloads automatically
+                        var downloadButtonContainer = document.getElementById('downloadAllByLang').parentElement;
+                        downloadButtonContainer.style.display = 'none';
+                    }
+                    
+                    // Update progress to 100%
+                    targetProgress = 100;
+                } 
+                
+                // Update progress based on status
+                if (!data.complete && !data.error) {
+                    if (data.status.includes('Reading CSV')) {
+                        targetProgress = 20;
+                    } 
+                    else if (data.status.includes('Processing')) {
+                        targetProgress = 50;
+                    }
+                }
+            });
+            
+            // Export functionality has been removed
+            
+            // Helper function to get language name from code
+            function getLangNameFromCode(code) {
+                var langNames = {
+                    'TR': 'turkish',
+                    'FR': 'french',
+                    'DE': 'german',
+                    'ES': 'spanish',
+                    'IT': 'italian',
+                    'PT': 'portuguese',
+                    'RU': 'russian',
+                    'JP': 'japanese',
+                    'KR': 'korean',
+                    'CN_TR': 'chinese',
+                    'AR': 'arabic',
+                    'ID': 'indonesian',
+                    'MY': 'malay',
+                    'TH': 'thai',
+                    'VN': 'vietnamese',
+                    'RO': 'romanian',
+                    'PL': 'polish',
+                    'CZ': 'czech',
+                    'HU': 'hungarian'
+                };
+                return langNames[code] || code.toLowerCase();
+            }
+            
+            // Handle Download All by Lang button click
+            document.getElementById('downloadAllByLang').addEventListener('click', function() {
+                // Disable button and show loading state
+                this.disabled = true;
+                var originalText = this.innerHTML;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Preparing download...';
+                var button = this;
+                
+                // Get the languages from the status container text
+                var statusText = document.getElementById('status-container').innerText;
+                var languageMatch = statusText.match(/Selected languages:\s*([\w,\s]+)/);
+                var langCodesStr = languageMatch ? languageMatch[1].trim() : 'TR, DE, FR';
+                var selectedLangCodes = langCodesStr.split(/[,\s]+/).filter(Boolean);
+                
+                console.log('Downloading by language for:', selectedLangCodes);
+                
+                // Use XMLHttpRequest for binary data download
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/download_all_by_lang', true);
+                xhr.responseType = 'blob'; // Set response type to blob for binary data
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                
+                xhr.onload = function() {
+                    // Reset button state
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                    
+                    if (this.status === 200) {
+                        console.log('Download ready, content type:', this.response.type);
+                        
+                        // Create a download link
+                        var blob = new Blob([this.response], { type: 'application/zip' });
+                        var url = window.URL.createObjectURL(blob);
+                        var a = document.createElement('a');
+                        var timestamp = new Date().toISOString().replace(/[\-:]/g, '').replace(/\..+/, '');
+                        a.href = url;
+                        a.download = 'all_translations_' + timestamp + '.zip';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        console.log('Download initiated');
+                    } else {
+                        console.error('Error downloading file:', this.status, this.statusText);
+                        alert('Error downloading file: ' + this.statusText);
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    console.error('Request failed');
+                    button.disabled = false;
+                    button.innerHTML = originalText;
+                    alert('Error downloading file. Please check console for details.');
+                };
+                
+                // Send the request with languages
+                xhr.send('languages=' + encodeURIComponent(selectedLangCodes.join(',')));
+                console.log('Download request sent');
+            });
+            
+            // Helper function to get human-readable language names
+            function getLanguageName(code) {
+                var languageNames = {
+                    'TR': 'Turkish', 
+                    'FR': 'French', 
+                    'DE': 'German',
+                    'ES': 'Spanish',
+                    'IT': 'Italian',
+                    'PT': 'Portuguese',
+                    'RU': 'Russian',
+                    'JP': 'Japanese',
+                    'KR': 'Korean',
+                    'CN_TR': 'Chinese',
+                    'AR': 'Arabic',
+                    'ID': 'Indonesian',
+                    'MY': 'Malay',
+                    'TH': 'Thai',
+                    'VN': 'Vietnamese',
+                    'RO': 'Romanian',
+                    'PL': 'Polish',
+                    'CZ': 'Czech',
+                    'HU': 'Hungarian'
+                };
+                return languageNames[code] || code;
+            }
+        });
+    </script>
+</body>
+</html>
