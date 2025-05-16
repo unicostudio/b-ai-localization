@@ -537,23 +537,24 @@ def handle_start_processing(data=None):
             })
             return
         
-        # Default chars.json handling - use the one in the app directory if none specified
-        if not chars_file:
-            default_chars_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chars.json')
-            if os.path.exists(default_chars_file):
-                chars_file = default_chars_file
-                emit('update_status', {'status': f'Using default characters file: {chars_file}'})
-            else:
-                emit('update_status', {'status': 'No characters file found, proceeding without character replacements'})
+        # Always use example_chars.json as the default character file
+        # Try to use explicitly specified chars file first
+        if chars_file and os.path.isfile(chars_file):
+            emit('update_status', {'status': f'Using specified characters file: {chars_file}'})
         else:
-            # User specified a chars file path - verify it exists
-            if not os.path.isfile(chars_file):
+            # Look for example_chars.json in the app directory
+            example_chars_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'example_chars.json')
+            if os.path.exists(example_chars_file):
+                chars_file = example_chars_file
+                emit('update_status', {'status': f'Using example character file: {chars_file}'})
+            else:
+                # Fall back to chars.json if example_chars.json doesn't exist
                 default_chars_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'chars.json')
                 if os.path.exists(default_chars_file):
-                    emit('update_status', {'status': f'Specified characters file not found, using default: {default_chars_file}'})
                     chars_file = default_chars_file
+                    emit('update_status', {'status': f'Using fallback character file: {chars_file}'})
                 else:
-                    emit('update_status', {'status': 'No valid characters file available, proceeding without character replacements'})
+                    emit('update_status', {'status': 'Warning: No character file found. Character names will not be localized correctly.'})
                     chars_file = None
         
         emit('update_status', {'status': 'Reading CSV file...'})

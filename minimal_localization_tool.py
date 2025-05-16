@@ -317,27 +317,45 @@ def load_character_data(chars_file):
 
 def replace_character_names(text, language, char_lookup):
     """Replace character names in the given text with localized versions"""
-    # Skip if no character data exists for this language
-    if language not in char_lookup:
+    # Skip if no character data exists for this language or if text is empty
+    if not text or language not in char_lookup:
         return text
+    
+    # Print debug information about character replacements
+    print(f"\n✓ Applying character replacements for language: {language}")
+    print(f"✓ Available character mappings: {list(char_lookup[language].keys())}")
     
     # Get character replacements for this language
     char_data = char_lookup[language]
     
-    # Get all character names in the text
+    # Start with the original text
     result = text
+    original = text
     
-    # Apply character replacements
+    # Special case handling - known common variations and misspellings
+    special_cases = {
+        "lily": ["lilly", "lillie"],   # Common misspellings of Lily
+        "amy": ["amie", "aimee"],     # Common variations of Amy
+        "bubba": ["buba", "bubber"]   # Common variations of Bubba
+    }
+    
+    # Apply character replacements with special handling for variations
     for english_name, localized_name in char_data.items():
-        # Create a pattern to match the English name, with proper case sensitivity
-        # Handle both normal cases (Lily) and special cases (Lilly/Bediş)
+        # Standard replacement - case insensitive
         pattern = r'\b' + re.escape(english_name) + r'\b'
         result = re.sub(pattern, localized_name, result, flags=re.IGNORECASE)
         
-        # Also handle common misspellings (like Lilly instead of Lily)
-        if english_name.lower() == "lily" and "lilly" in result.lower():
-            result = re.sub(r'\bLilly\b', localized_name, result, flags=re.IGNORECASE)
-        
+        # Check for special cases and their variations
+        english_lower = english_name.lower()
+        if english_lower in special_cases:
+            for variation in special_cases[english_lower]:
+                variation_pattern = r'\b' + variation + r'\b'
+                result = re.sub(variation_pattern, localized_name, result, flags=re.IGNORECASE)
+    
+    # Report if any replacements were made for debugging
+    if result != original:
+        print(f"✓ Character names replaced in text: {original} -> {result}")
+    
     return result
 
 def process_localization(description, english_text, model="grok3", languages=None, debug=False, char_lookup=None, api_key=None, custom_prompt=None):
