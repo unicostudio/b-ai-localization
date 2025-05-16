@@ -492,18 +492,28 @@ Please provide localized versions in {language_list} that preserve the meaning, 
         for lang_code in languages:
             lang_name = LANGUAGE_NAMES.get(lang_code.upper(), "").lower()
             if lang_name in localization:
-                # Remove the "Localization:**\n\n" prefix and any explanations that follow the translated text
+                # Clean up the text by removing all prefixes and explanations
                 text = localization[lang_name]
                 
-                # First, check if it has the format pattern
+                # Remove "Localization:**\n\n" prefix if present
                 if "Localization:**" in text:
-                    # Remove the prefix
                     text = re.sub(r'Localization:\*\*\n\n', '', text)
+                
+                # Remove "**Text:**" prefix if present
+                if "**Text:**" in text:
+                    text = re.sub(r'\*\*Text:\*\*\s*', '', text)
+                
+                # Remove any explanation sections
+                for pattern in [r'\*\*Explanation:\*\*.*', r'\n\n\*\*Explanation:.*', r'\*\*Localization Notes:\*\*.*', r'\n\n\*\*Localization Notes:.*']:
+                    text = re.sub(pattern, '', text, flags=re.DOTALL)
+                
+                # Remove any "Explanation:**" prefix and content after it
+                explanation_match = re.search(r'(Explanation:|\*\*Explanation:)', text)
+                if explanation_match:
+                    text = text[:explanation_match.start()].strip()
                     
-                    # Extract just the actual translation (everything before Explanation or end of string)
-                    explanation_match = re.search(r'(\*\*Explanation:|\n\n\*\*Explanation:)', text)
-                    if explanation_match:
-                        text = text[:explanation_match.start()].strip()
+                # Final cleanup - remove any trailing whitespace or newlines
+                text = text.strip()
                         
                 # Apply character name replacements if character lookup is provided
                 if char_lookup:
