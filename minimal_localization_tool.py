@@ -315,20 +315,28 @@ def load_character_data(chars_file):
         print(f"✗ Error loading character data: {str(e)}")
         return {}
 
-def replace_character_names(text, lang, char_lookup):
-    """Replace character names in text with localized versions"""
-    if not char_lookup or lang not in char_lookup:
+def replace_character_names(text, language, char_lookup):
+    """Replace character names in the given text with localized versions"""
+    # Skip if no character data exists for this language
+    if language not in char_lookup:
         return text
-        
-    result = text
-    # Sort by length of name (longest first) to avoid partial replacements
-    sorted_names = sorted(char_lookup[lang].keys(), key=len, reverse=True)
     
-    for en_name in sorted_names:
-        localized_name = char_lookup[lang][en_name]
-        # Use word boundaries to avoid replacing substrings of words
-        pattern = r'\b' + re.escape(en_name) + r'\b'
-        result = re.sub(pattern, localized_name, result)
+    # Get character replacements for this language
+    char_data = char_lookup[language]
+    
+    # Get all character names in the text
+    result = text
+    
+    # Apply character replacements
+    for english_name, localized_name in char_data.items():
+        # Create a pattern to match the English name, with proper case sensitivity
+        # Handle both normal cases (Lily) and special cases (Lilly/Bediş)
+        pattern = r'\b' + re.escape(english_name) + r'\b'
+        result = re.sub(pattern, localized_name, result, flags=re.IGNORECASE)
+        
+        # Also handle common misspellings (like Lilly instead of Lily)
+        if english_name.lower() == "lily" and "lilly" in result.lower():
+            result = re.sub(r'\bLilly\b', localized_name, result, flags=re.IGNORECASE)
         
     return result
 
@@ -397,11 +405,13 @@ def process_localization(description, english_text, model="grok3", languages=Non
     These should preserve the game mechanics, humor, and puzzle elements but adapt them to feel natural 
     in each target language.
 
-    Format your response with ONLY the localized text for each language, like this:
+    Format your response for each language as follows:
     
-    {"\n    ".join([f"{LANGUAGE_NAMES.get(lang_code.upper(), 'Unknown').title()}: [{LANGUAGE_NAMES.get(lang_code.upper(), 'Unknown').title()} localization]" for lang_code in languages])}
+    {"\n    ".join([f"{LANGUAGE_NAMES.get(lang_code.upper(), 'Unknown').title()}: [Translated text only]" for lang_code in languages])}
     
-    Do not include ANY additional explanations, notes, or context.
+    Do not include ANY additional explanations, notes, or context in your response.
+    Do not include the "Localization:**" prefix or any explanation section.
+    Return ONLY the direct translations for each language.
     """
     
     try:
@@ -478,14 +488,29 @@ Please provide localized versions in {language_list} that preserve the meaning, 
                 print(f"Warning: Could not extract {lang} localization")
                 localization[lang] = f"Error: Could not extract {lang} localization"
         
-        # Apply character name replacements if character lookup is provided
-        if char_lookup:
-            # Get language names from selected language codes
-            for lang_code in languages:
-                lang_name = LANGUAGE_NAMES.get(lang_code.upper(), "").lower()
-                if lang_name in localization:
-                    # Replace character names in the translation
-                    localization[lang_name] = replace_character_names(localization[lang_name], lang_name, char_lookup)
+        # Process output format and apply character name replacements if needed
+        for lang_code in languages:
+            lang_name = LANGUAGE_NAMES.get(lang_code.upper(), "").lower()
+            if lang_name in localization:
+                # Remove the "Localization:**\n\n" prefix and any explanations that follow the translated text
+                text = localization[lang_name]
+                
+                # First, check if it has the format pattern
+                if "Localization:**" in text:
+                    # Remove the prefix
+                    text = re.sub(r'Localization:\*\*\n\n', '', text)
+                    
+                    # Extract just the actual translation (everything before Explanation or end of string)
+                    explanation_match = re.search(r'(\*\*Explanation:|\n\n\*\*Explanation:)', text)
+                    if explanation_match:
+                        text = text[:explanation_match.start()].strip()
+                        
+                # Apply character name replacements if character lookup is provided
+                if char_lookup:
+                    text = replace_character_names(text, lang_name, char_lookup)
+                    
+                # Update the localization with clean text
+                localization[lang_name] = text
         
         print("✓ Successfully processed localizations")
         return localization
