@@ -459,23 +459,76 @@ function generateLanguageSpecificResults(results) {
         'END': 'endText'
     };
     
+    // Process character names using chars.json before localization
+    const processCharacterNames = (text) => {
+        if (!window.characterData || Object.keys(window.characterData).length === 0) {
+            return text; // No character data available
+        }
+        
+        let processedText = text;
+        
+        // Apply character name replacements
+        Object.keys(window.characterData).forEach(charName => {
+            const charData = window.characterData[charName];
+            if (charData && charData.variations) {
+                // Create regex with word boundaries to replace full character names
+                const regex = new RegExp(`\\b${escapeRegExp(charName)}\\b`, 'g');
+                processedText = processedText.replace(regex, charName);
+                
+                // Also replace any known variations
+                if (Array.isArray(charData.variations)) {
+                    charData.variations.forEach(variation => {
+                        if (variation && variation !== charName) {
+                            const variationRegex = new RegExp(`\\b${escapeRegExp(variation)}\\b`, 'g');
+                            processedText = processedText.replace(variationRegex, charName);
+                        }
+                    });
+                }
+            }
+        });
+        
+        return processedText;
+    };
+    
     // Function to clean text content
     const cleanTextContent = (text) => {
         if (!text) return '';
         
-        // Remove explanations and German translations
+        // Remove explanations and translations
         let cleanedText = text;
         
-        // Remove content after German or explanation indicators
+        // First, remove specific explanation patterns
+        const explanationPatterns = [
+            /Explanation:.*/g,
+            /Note:.*/g,
+            /\(Note:.*/g, 
+            /- This.*/g,
+            /- ".*" is.*/g,
+            /\*\(Note:.*/g,
+            /\*\*German:\*\*.*/g,
+            /German:.*/g,
+            /> Explanation:.*/g,
+            /\(Literal:.*/g
+        ];
+        
+        for (const pattern of explanationPatterns) {
+            cleanedText = cleanedText.replace(pattern, '');
+        }
+        
+        // Remove content after common explanation indicators
         const cutoffPoints = [
             '**German:**',
             '### German:',
             '- Explanation:',
+            'Explanation:',
             '### Notes:',
             '✅ Notes:',
             '*(Note:',
             '---',
-            '✅'
+            '✅',
+            ' - ',
+            ' > ',
+            ' - "'
         ];
         
         for (const cutPoint of cutoffPoints) {
@@ -485,9 +538,14 @@ function generateLanguageSpecificResults(results) {
             }
         }
         
-        // Remove asterisks and newlines
-        cleanedText = cleanedText.replace(/\*/g, '');
-        cleanedText = cleanedText.replace(/\n/g, ' ');
+        // Remove special characters
+        cleanedText = cleanedText.replace(/\*/g, ''); // Asterisks
+        cleanedText = cleanedText.replace(/\n/g, ' '); // Newlines
+        cleanedText = cleanedText.replace(/\-/g, ''); // Hyphens at end
+        
+        // Clean up formatting issues
+        cleanedText = cleanedText.replace(/^\s*"(.*)"\s*$/, '$1'); // Remove surrounding quotes
+        cleanedText = cleanedText.replace(/^["']|["']$/g, ''); // Remove quotes at beginning/end
         
         // Remove multiple spaces and trim
         cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
@@ -519,7 +577,7 @@ function generateLanguageSpecificResults(results) {
                     // Map the key type to new format if needed
                     let newKeyType = keyMappings[baseKey] || baseKey.toLowerCase();
                     
-                    // Format the new key name
+                    // Format the new key name (no double underscore)
                     let newKey;
                     if (baseKey === 'LEVEL_TEXT' || baseKey === 'END') {
                         newKey = `${newKeyType}_${sequence1}`;
@@ -530,7 +588,12 @@ function generateLanguageSpecificResults(results) {
                     // Add translated content for each language
                     languages.forEach(lang => {
                         if (item[key][lang]) {
-                            languageData[lang][newKey] = cleanTextContent(item[key][lang]);
+                            // Process text: first clean it, then apply character name standardization
+                            let processedText = cleanTextContent(item[key][lang]);
+                            processedText = processCharacterNames(processedText);
+                            
+                            // Store the fully processed text
+                            languageData[lang][newKey] = processedText;
                         } else if (item[key]['EN'] && lang !== 'EN') {
                             // If translation is missing but English exists, use English
                             languageData[lang][newKey] = '[MISSING TRANSLATION] ' + cleanTextContent(item[key]['EN']);
