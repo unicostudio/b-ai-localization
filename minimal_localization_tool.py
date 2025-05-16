@@ -332,7 +332,7 @@ def replace_character_names(text, language, char_lookup):
     result = text
     original = text
     
-    # Special case handling - known common variations and misspellings
+    # Define special case handling for known variations and misspellings
     special_cases = {
         "lily": ["lilly", "lillie"],   # Common misspellings of Lily
         "amy": ["amie", "aimee"],     # Common variations of Amy
