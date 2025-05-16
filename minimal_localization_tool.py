@@ -332,7 +332,7 @@ def replace_character_names(text, lang, char_lookup):
         
     return result
 
-def process_localization(description, english_text, model="grok3", languages=None, debug=False, char_lookup=None, api_key=None):
+def process_localization(description, english_text, model="grok3", languages=None, debug=False, char_lookup=None, api_key=None, custom_prompt=None):
     """Process localization using the selected model"""
     # Default languages if none specified
     if languages is None:
@@ -363,8 +363,13 @@ def process_localization(description, english_text, model="grok3", languages=Non
                 
         return result
     
-    # Context prompt explaining what we want
-    system_prompt = f"""
+    # Use custom prompt if provided, otherwise use default
+    if custom_prompt:
+        # Replace placeholders in the custom prompt
+        system_prompt = custom_prompt
+    else:
+        # Default context prompt explaining what we want
+        system_prompt = f"""
     You are a game localization translator expert.
 
     You have been provided with an image description and English text from a 'Brain Test' puzzle game.
@@ -529,11 +534,11 @@ def read_csv_file(csv_file):
         print(f"✗ Error reading CSV file: {str(e)}")
         return []
 
-def process_csv_data(csv_data, images_dir, chars_file=None, model="grok3", languages=None, api_key=None, debug=False, skip_images=False):
+def process_csv_data(csv_data, images_dir, chars_file=None, model="grok3", languages=None, api_key=None, debug=False, skip_images=False, custom_prompt=None):
+    """Process CSV data and generate localization results"""
     # Default languages if none provided
     if languages is None:
         languages = ["TR", "FR", "DE"]
-    """Process CSV data and generate localization results"""
     # Load character data if a file is provided
     char_lookup = None
     if chars_file:
@@ -597,7 +602,7 @@ def process_csv_data(csv_data, images_dir, chars_file=None, model="grok3", langu
             english_text = row['EN']
             
             # Process localization for this text
-            localization = process_localization(description, english_text, model, languages, debug, char_lookup, api_key)
+            localization = process_localization(description, english_text, model, languages, debug, char_lookup, api_key, custom_prompt)
             
             # Add localization to the result
             result_entry = {"EN": english_text}

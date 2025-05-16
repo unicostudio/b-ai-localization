@@ -398,6 +398,10 @@ def process():
         session.pop('csv_path', None)
         return redirect(url_for('index'))
     
+    # Get custom prompt and game selection (new in Step 7)
+    custom_prompt = request.form.get('custom_prompt', '')
+    game_selection = request.form.get('game_selection', 'brain-test-1')
+    
     # Store processing parameters in session
     session['processing'] = {
         'csv_path': csv_path,
@@ -408,7 +412,9 @@ def process():
         'api_key': api_key,
         'debug_mode': debug_mode,
         'skip_images': skip_images,
-        'output_formats': selected_formats  # Store the selected output formats
+        'output_formats': selected_formats,  # Store the selected output formats
+        'custom_prompt': custom_prompt,      # Store the custom prompt
+        'game_selection': game_selection     # Store the game selection
     }
     
     return redirect(url_for('processing'))
@@ -507,6 +513,8 @@ def handle_start_processing(data=None):
         languages = params.get('languages', ['TR', 'FR', 'DE'])
         api_key = params.get('api_key', '')
         debug_mode = params.get('debug_mode', False)
+        custom_prompt = params.get('custom_prompt', '')
+        game_selection = params.get('game_selection', 'brain-test-1')
         
         # Print session data for debugging
         print(f"Session data during processing: {session.get('processing')}")
@@ -571,7 +579,12 @@ def handle_start_processing(data=None):
             images_dir = None
             
         # Process data
-        results = process_csv_data(csv_data, images_dir, chars_file, model, languages, api_key, debug_mode, skip_images)
+        emit('update_status', {'status': f'Using game profile: {game_selection.replace("-", " ").title()}'})
+        if custom_prompt:
+            emit('update_status', {'status': 'Using custom prompt for localization'})
+        
+        # Process data with custom prompt
+        results = process_csv_data(csv_data, images_dir, chars_file, model, languages, api_key, debug_mode, skip_images, custom_prompt=custom_prompt)
         if not results:
             emit('update_status', {'status': 'Error: Failed to process data.', 'error': True})
             return

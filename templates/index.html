@@ -261,6 +261,34 @@
                                 </div>
                             </div>
                             
+                            <div class="mb-4">
+                                <h3 class="section-title">Step 7: Customize Prompt for Game</h3>
+                                <p>Select a game and customize the default prompt if needed:</p>
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <div class="input-group">
+                                            <select class="form-select" id="game-selection" name="game_selection">
+                                                <option value="brain-test-1" selected>Brain Test 1</option>
+                                                <option value="brain-test-2">Brain Test 2</option>
+                                                <option value="brain-test-3">Brain Test 3</option>
+                                                <option value="brain-test-4">Brain Test 4</option>
+                                            </select>
+                                            <button class="btn btn-primary" type="button" id="save-prompt-btn">Save Prompt</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <textarea class="form-control" id="custom-prompt" name="custom_prompt" rows="10" style="font-family: monospace;"></textarea>
+                                        <div class="form-text">
+                                            Customize the prompt for the selected game. The prompt will guide the AI in creating appropriate localizations.<br>
+                                            <strong>Placeholders:</strong> <code>{description}</code> for image description, <code>{languages}</code> for selected languages list, <code>{english_text}</code> for the original text.<br>
+                                            Your changes will be saved when you click 'Save Prompt' and applied during localization.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <button type="submit" class="btn btn-success">Start Localization Process</button>
                             
 
@@ -358,6 +386,168 @@
             languageCheckboxes.forEach(function(checkbox) {
                 checkbox.addEventListener('change', updateSelectAllCheckbox);
             });
+            
+            // Custom prompt handling for different games
+            const gameSelection = document.getElementById('game-selection');
+            const customPromptTextarea = document.getElementById('custom-prompt');
+            const savePromptBtn = document.getElementById('save-prompt-btn');
+            
+            // Default prompts for each game
+            const gamePrompts = {
+                'brain-test-1': `You are a game localization translator expert.
+
+You have been provided with an image description and English text from a 'Brain Test' puzzle game.
+You can use the following information for localization:
+    
+    You're localizing a 'Brain Test' named children's brain teaser game that uses word play, 
+    Brain Test is a children's brain teaser game that is popular worldwide, known for its tricky and often unexpected brain teasers.
+    
+    IMPORTANT NOTE: DO NOT translate any character names in the text. Keep all character names as they are in English.
+    Character names like Lily, Granny Amy, Uncle Bubba, etc. should remain unchanged in your translation.
+    These will be replaced with the proper localized names in a separate step.
+    
+    more information about the game:
+    
+    https://play.google.com/store/apps/details?id=com.unicostudio.braintest&hl=tr
+
+Image Description:
+{description}
+
+Your task is to provide culturally-appropriate localizations of the English text in the following languages:
+{languages}
+
+For localization, use cultural references, idioms, and wordplay specific to each language.
+
+These should preserve the game mechanics, humor, and puzzle elements but adapt them to feel natural 
+in each target language.`,
+                
+                'brain-test-2': `You are a game localization translator expert.
+
+You have been provided with an image description and English text from 'Brain Test 2' puzzle game.
+You can use the following information for localization:
+    
+    You're localizing 'Brain Test 2: Tricky Stories', a sequel to the popular Brain Test game. This game features tricky puzzles with a focus on storytelling and character development.
+    
+    IMPORTANT NOTE: DO NOT translate any character names in the text. Keep all character names as they are in English.
+    Character names like Lily, Granny Amy, Uncle Bubba, etc. should remain unchanged in your translation.
+    These will be replaced with the proper localized names in a separate step.
+    
+    more information about the game:
+    
+    https://play.google.com/store/apps/details?id=com.unicostudio.braintest2&hl=tr
+
+Image Description:
+{description}
+
+Your task is to provide culturally-appropriate localizations of the English text in the following languages:
+{languages}
+
+For localization, use cultural references, idioms, and wordplay specific to each language.
+
+These should preserve the game mechanics, humor, and puzzle elements but adapt them to feel natural 
+in each target language.`,
+                
+                'brain-test-3': `You are a game localization translator expert.
+
+You have been provided with an image description and English text from 'Brain Test 3' puzzle game.
+You can use the following information for localization:
+    
+    You're localizing 'Brain Test 3: Tricky Quests', the third installment in the popular Brain Test series. This game introduces more complex puzzles and quests.
+    
+    IMPORTANT NOTE: DO NOT translate any character names in the text. Keep all character names as they are in English.
+    Character names like Lily, Granny Amy, Uncle Bubba, etc. should remain unchanged in your translation.
+    These will be replaced with the proper localized names in a separate step.
+    
+    more information about the game:
+    
+    https://play.google.com/store/apps/details?id=com.unicostudio.braintest3&hl=tr
+
+Image Description:
+{description}
+
+Your task is to provide culturally-appropriate localizations of the English text in the following languages:
+{languages}
+
+For localization, use cultural references, idioms, and wordplay specific to each language.
+
+These should preserve the game mechanics, humor, and puzzle elements but adapt them to feel natural 
+in each target language.`,
+                
+                'brain-test-4': `You are a game localization translator expert.
+
+You have been provided with an image description and English text from 'Brain Test 4' puzzle game.
+You can use the following information for localization:
+    
+    You're localizing 'Brain Test 4: Tricky Friends', the latest installment in the Brain Test series. This game focuses on cooperative puzzles and multiplayer challenges.
+    
+    IMPORTANT NOTE: DO NOT translate any character names in the text. Keep all character names as they are in English.
+    Character names like Lily, Granny Amy, Uncle Bubba, etc. should remain unchanged in your translation.
+    These will be replaced with the proper localized names in a separate step.
+    
+    more information about the game:
+    
+    https://play.google.com/store/apps/details?id=com.unicostudio.braintest4&hl=tr
+
+Image Description:
+{description}
+
+Your task is to provide culturally-appropriate localizations of the English text in the following languages:
+{languages}
+
+For localization, use cultural references, idioms, and wordplay specific to each language.
+
+These should preserve the game mechanics, humor, and puzzle elements but adapt them to feel natural 
+in each target language.`
+            };
+            
+            // Load saved prompts from localStorage if available
+            function loadSavedPrompts() {
+                const savedPrompts = localStorage.getItem('gamePrompts');
+                if (savedPrompts) {
+                    try {
+                        const parsedPrompts = JSON.parse(savedPrompts);
+                        // Merge with default prompts, keeping custom ones
+                        Object.keys(parsedPrompts).forEach(key => {
+                            gamePrompts[key] = parsedPrompts[key];
+                        });
+                    } catch (e) {
+                        console.error('Error loading saved prompts:', e);
+                    }
+                }
+            }
+            
+            // Update the textarea with the prompt for the selected game
+            function updatePromptTextarea() {
+                const selectedGame = gameSelection.value;
+                customPromptTextarea.value = gamePrompts[selectedGame] || '';
+            }
+            
+            // Save the current prompt for the selected game
+            function saveCurrentPrompt() {
+                const selectedGame = gameSelection.value;
+                const currentPrompt = customPromptTextarea.value.trim();
+                
+                if (currentPrompt) {
+                    gamePrompts[selectedGame] = currentPrompt;
+                    localStorage.setItem('gamePrompts', JSON.stringify(gamePrompts));
+                    
+                    // Show success message
+                    const alertModal = new bootstrap.Modal(document.getElementById('alertModal'));
+                    document.getElementById('alertModalLabel').textContent = 'Success';
+                    document.getElementById('alertModalBody').innerHTML = `<div class="alert alert-success">Prompt for ${selectedGame.replace(/-/g, ' ')} saved successfully!</div>`;
+                    alertModal.show();
+                } else {
+                    alert('Please enter a valid prompt');
+                }
+            }
+            
+            // Initialize
+            loadSavedPrompts();
+            updatePromptTextarea();
+            
+            // Event listeners
+            gameSelection.addEventListener('change', updatePromptTextarea);
+            savePromptBtn.addEventListener('click', saveCurrentPrompt);
         });
     </script>
 </body>
