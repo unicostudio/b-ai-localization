@@ -1,0 +1,82 @@
+/* Main Styles for Game Localization Tool Client Version */
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.main-container {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.section-title {
+    border-bottom: 2px solid #f8f9fa;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+#csvPreview {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+#statusLog {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.status-item {
+    padding: 5px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.status-item:last-child {
+    border-bottom: none;
+}
+
+.status-success {
+    color: #198754;
+}
+
+.status-error {
+    color: #dc3545;
+}
+
+.status-warning {
+    color: #fd7e14;
+}
+
+.status-info {
+    color: #0d6efd;
+}
+
+/* Animation for processing */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.processing {
+    animation: pulse 1.5s infinite;
+}
+
+/* Table styles */
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.table-responsive {
+    white-space: nowrap;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+    .main-container {
+        padding: 20px 15px;
+    }
+}
